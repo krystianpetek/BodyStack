@@ -77,4 +77,22 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
             _tokenProtector.Unprotect(entity.RefreshTokenProtected),
             entity.UpdatedAt);
     }
+
+    public async Task<FitatuSessionDto?> GetLatestAsync(CancellationToken cancellationToken = default)
+    {
+        var entity = await _db.FitatuSessions
+            .OrderByDescending(x => x.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (entity is null)
+        {
+            return null;
+        }
+
+        return new FitatuSessionDto(
+            entity.FitatuUserId,
+            _tokenProtector.Unprotect(entity.TokenProtected),
+            _tokenProtector.Unprotect(entity.RefreshTokenProtected),
+            entity.UpdatedAt);
+    }
 }

@@ -19,6 +19,9 @@ public class Program
         builder.Services.AddScoped<Infrastructure.Security.ITokenProtector, Infrastructure.Security.TokenProtector>();
         builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
         builder.Services.AddScoped<Application.Fitatu.FitatuLoginUseCase>();
+        builder.Services.AddScoped<Application.Fitatu.FitatuGetDayUseCase>();
+
+        builder.Services.AddSingleton<Domain.Fitatu.FitatuDayPlanTotalsCalculator>();
 
         builder.Services.AddOptions<Integrations.Fitatu.FitatuOptions>()
             .Bind(builder.Configuration.GetSection("Fitatu"))
@@ -67,6 +70,27 @@ public class Program
                 return TypedResults.Ok(new Api.Fitatu.FitatuLoginResponse("ok"));
             })
             .WithName("FitatuLogin");
+
+        app.MapGet("/api/fitatu/day/{date}", async (
+                string date,
+                Application.Fitatu.FitatuGetDayUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var day))
+                {
+                    return Results.BadRequest(new { error = "Invalid date format. Expected yyyy-MM-dd." });
+                }
+
+                var computed = await useCase.ExecuteAsync(day, cancellationToken);
+
+                var response = new Api.Fitatu.FitatuDayResponse(
+                    Date: day.ToString("yyyy-MM-dd"),
+                    Totals: Api.Fitatu.FitatuTotals.From(computed.Totals),
+                    Meals: computed.Meals.Select(Api.Fitatu.FitatuMealTotals.From).ToArray());
+
+                return Results.Ok(response);
+            })
+            .WithName("FitatuGetDay");
 
         var summaries = new[]
         {
