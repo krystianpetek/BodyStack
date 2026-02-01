@@ -1,58 +1,35 @@
-import { useEffect, useState } from 'react';
-import './App.css';
-
-interface Forecast {
-    date: string;
-    temperatureC: number;
-    temperatureF: number;
-    summary: string;
-}
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import './App.css'
+import DashboardPage from './pages/DashboardPage'
+import LoginPage from './pages/LoginPage'
 
 function App() {
-    const [forecasts, setForecasts] = useState<Forecast[]>();
-
-    useEffect(() => {
-        populateWeatherData();
-    }, []);
-
-    const contents = forecasts === undefined
-        ? <p><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.</em></p>
-        : <table className="table table-striped" aria-labelledby="tableLabel">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Temp. (C)</th>
-                    <th>Temp. (F)</th>
-                    <th>Summary</th>
-                </tr>
-            </thead>
-            <tbody>
-                {forecasts.map(forecast =>
-                    <tr key={forecast.date}>
-                        <td>{forecast.date}</td>
-                        <td>{forecast.temperatureC}</td>
-                        <td>{forecast.temperatureF}</td>
-                        <td>{forecast.summary}</td>
-                    </tr>
-                )}
-            </tbody>
-        </table>;
+    const { i18n, t } = useTranslation()
 
     return (
         <div>
-            <h1 id="tableLabel">Weather forecast</h1>
-            <p>This component demonstrates fetching data from the server.</p>
-            {contents}
-        </div>
-    );
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                <h1 style={{ margin: 0 }}>{t('app.title')}</h1>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button type="button" onClick={() => i18n.changeLanguage('en')} disabled={i18n.resolvedLanguage === 'en'}>
+                        EN
+                    </button>
+                    <button type="button" onClick={() => i18n.changeLanguage('pl')} disabled={i18n.resolvedLanguage === 'pl'}>
+                        PL
+                    </button>
+                </div>
+            </header>
 
-    async function populateWeatherData() {
-        const response = await fetch('weatherforecast');
-        if (response.ok) {
-            const data = await response.json();
-            setForecasts(data);
-        }
-    }
+            <main style={{ marginTop: '1rem' }}>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </main>
+        </div>
+    )
 }
 
-export default App;
+export default App
