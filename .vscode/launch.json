@@ -2,15 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Containers .NET Attach (Preview)",
-            "type": "docker",
-            "request": "attach",
-            "platform": "netCore",
-            "sourceFileMap": {
-                "/src": "${workspaceFolder}"
-            }
-        },
-        {
             "type": "edge",
             "request": "launch",
             "name": "localhost (Edge)",
@@ -23,6 +14,12 @@
             "name": "localhost (Chrome)",
             "url": "https://localhost:51618",
             "webRoot": "${workspaceFolder}"
+        },
+        {
+            "name": "C#: BodyStack.Server Debug",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/BodyStack.Server/BodyStack.Server.csproj"
         }
     ]
 }
