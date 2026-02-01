@@ -11,6 +11,8 @@ public class Program
         // Add services to the container.
         builder.Services.AddAuthorization();
 
+        builder.Services.AddSignalR();
+
         builder.Services.AddDataProtection();
 
         builder.Services.AddDbContext<Infrastructure.Persistence.AppDbContext>(options =>
@@ -20,8 +22,12 @@ public class Program
         builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
         builder.Services.AddScoped<Application.Fitatu.FitatuLoginUseCase>();
         builder.Services.AddScoped<Application.Fitatu.FitatuGetDayUseCase>();
+        builder.Services.AddScoped<Application.Fitatu.FitatuStartMonthRecalculationUseCase>();
 
         builder.Services.AddSingleton<Domain.Fitatu.FitatuDayPlanTotalsCalculator>();
+
+        builder.Services.AddSingleton<Infrastructure.Background.IBackgroundTaskQueue<Application.Fitatu.FitatuMonthRecalculationRequest>, Infrastructure.Background.BackgroundTaskQueue<Application.Fitatu.FitatuMonthRecalculationRequest>>();
+        builder.Services.AddHostedService<Infrastructure.Background.FitatuMonthRecalculationWorker>();
 
         builder.Services.AddOptions<Integrations.Fitatu.FitatuOptions>()
             .Bind(builder.Configuration.GetSection("Fitatu"))
@@ -61,6 +67,8 @@ public class Program
 
         app.UseAuthorization();
 
+        app.MapHub<Realtime.FitatuMonthHub>("/hubs/fitatu-month");
+
         app.MapPost("/api/fitatu/login", async (
                 Api.Fitatu.FitatuLoginRequest request,
                 Application.Fitatu.FitatuLoginUseCase useCase,
@@ -91,6 +99,16 @@ public class Program
                 return Results.Ok(response);
             })
             .WithName("FitatuGetDay");
+
+        app.MapPost("/api/fitatu/month/{yearMonth}/recalculate", async (
+                string yearMonth,
+                Application.Fitatu.FitatuStartMonthRecalculationUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                await useCase.ExecuteAsync(yearMonth, cancellationToken);
+                return Results.Accepted();
+            })
+            .WithName("FitatuRecalculateMonth");
 
         var summaries = new[]
         {
