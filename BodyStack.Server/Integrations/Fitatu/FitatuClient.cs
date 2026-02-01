@@ -80,6 +80,8 @@ public sealed class FitatuClient : IFitatuClient
         var url = $"/api/diet-and-activity-plan/{Uri.EscapeDataString(userId)}/day/{date:yyyy-MM-dd}";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("api-key", _options.ApiKey);
+        request.Headers.TryAddWithoutValidation("api-secret", _options.ApiSecret ?? string.Empty);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);

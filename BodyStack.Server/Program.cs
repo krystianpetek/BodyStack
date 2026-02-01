@@ -6,7 +6,11 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = args,
+            ContentRootPath = AppContext.BaseDirectory
+        });
 
         // Add services to the container.
         builder.Services.AddAuthorization();
@@ -72,13 +76,38 @@ public class Program
 
         app.MapHub<Realtime.FitatuMonthHub>("/hubs/fitatu-month");
 
+        app.MapGet("/api/fitatu/session", async (
+                Application.Fitatu.IFitatuSessionRepository repository,
+                CancellationToken cancellationToken) =>
+            {
+                var session = await repository.GetLatestAsync(cancellationToken);
+                if (session is null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                return Results.Ok(new
+                {
+                    fitatuUserId = session.FitatuUserId,
+                    updatedAt = session.UpdatedAt
+                });
+            })
+            .WithName("FitatuSession");
+
         app.MapPost("/api/fitatu/login", async (
                 Api.Fitatu.FitatuLoginRequest request,
                 Application.Fitatu.FitatuLoginUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
-                await useCase.ExecuteAsync(request.Username, request.Password, cancellationToken);
-                return TypedResults.Ok(new Api.Fitatu.FitatuLoginResponse("ok"));
+                try
+                {
+                    await useCase.ExecuteAsync(request.Username, request.Password, cancellationToken);
+                    return TypedResults.Ok(new Api.Fitatu.FitatuLoginResponse("ok"));
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
             })
             .WithName("FitatuLogin");
 
@@ -92,14 +121,25 @@ public class Program
                     return Results.BadRequest(new { error = "Invalid date format. Expected yyyy-MM-dd." });
                 }
 
-                var computed = await useCase.ExecuteAsync(day, cancellationToken);
+                try
+                {
+                    var computed = await useCase.ExecuteAsync(day, cancellationToken);
 
-                var response = new Api.Fitatu.FitatuDayResponse(
-                    Date: day.ToString("yyyy-MM-dd"),
-                    Totals: Api.Fitatu.FitatuTotals.From(computed.Totals),
-                    Meals: computed.Meals.Select(Api.Fitatu.FitatuMealTotals.From).ToArray());
+                    var response = new Api.Fitatu.FitatuDayResponse(
+                        Date: day.ToString("yyyy-MM-dd"),
+                        Totals: Api.Fitatu.FitatuTotals.From(computed.Totals),
+                        Meals: computed.Meals.Select(Api.Fitatu.FitatuMealTotals.From).ToArray());
 
-                return Results.Ok(response);
+                    return Results.Ok(response);
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                {
+                    return Results.Unauthorized();
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
             })
             .WithName("FitatuGetDay");
 
@@ -108,8 +148,23 @@ public class Program
                 Application.Fitatu.FitatuStartMonthRecalculationUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
-                await useCase.ExecuteAsync(yearMonth, cancellationToken);
-                return Results.Accepted();
+                try
+                {
+                    await useCase.ExecuteAsync(yearMonth, cancellationToken);
+                    return Results.Accepted();
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                {
+                    return Results.Unauthorized();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = ex.Message });
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
             })
             .WithName("FitatuRecalculateMonth");
 
@@ -123,8 +178,15 @@ public class Program
                     return Results.BadRequest(new { error = "Invalid date format. Expected yyyy-MM-dd." });
                 }
 
-                var csv = await useCase.ExecuteAsync(day, cancellationToken);
-                return Results.Text(csv, "text/csv");
+                try
+                {
+                    var csv = await useCase.ExecuteAsync(day, cancellationToken);
+                    return Results.Text(csv, "text/csv");
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                {
+                    return Results.Unauthorized();
+                }
             })
             .WithName("FitatuExportDayCsv");
 
@@ -141,6 +203,14 @@ public class Program
                 catch (InvalidOperationException ex) when (ex.Message.StartsWith("Month export requires computed days.", StringComparison.Ordinal))
                 {
                     return Results.Conflict(new { error = ex.Message });
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                {
+                    return Results.Unauthorized();
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = ex.Message });
                 }
             })
             .WithName("FitatuExportMonthCsv");

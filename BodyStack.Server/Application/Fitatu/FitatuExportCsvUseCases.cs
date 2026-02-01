@@ -20,23 +20,26 @@ internal static class FitatuCsvBuilder
         var sb = new StringBuilder();
         sb.AppendLine("date,kcal,protein,fat,carbohydrate,fiber,sugars,salt");
 
+        static string F(decimal value)
+            => decimal.Round(value, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture);
+
         foreach (var r in rows)
         {
             sb.Append(r.Date);
             sb.Append(',');
-            sb.Append(r.Energy.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Energy));
             sb.Append(',');
-            sb.Append(r.Protein.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Protein));
             sb.Append(',');
-            sb.Append(r.Fat.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Fat));
             sb.Append(',');
-            sb.Append(r.Carbohydrate.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Carbohydrate));
             sb.Append(',');
-            sb.Append(r.Fiber.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Fiber));
             sb.Append(',');
-            sb.Append(r.Sugars.ToString(CultureInfo.InvariantCulture));
+            sb.Append(F(r.Sugars));
             sb.Append(',');
-            sb.AppendLine(r.Salt.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine(F(r.Salt));
         }
 
         return sb.ToString();

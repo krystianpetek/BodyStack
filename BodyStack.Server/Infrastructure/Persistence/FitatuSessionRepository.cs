@@ -2,6 +2,7 @@ using BodyStack.Server.Application.Fitatu;
 using BodyStack.Server.Infrastructure.Persistence.Entities;
 using BodyStack.Server.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace BodyStack.Server.Infrastructure.Persistence;
 
@@ -80,9 +81,13 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
 
     public async Task<FitatuSessionDto?> GetLatestAsync(CancellationToken cancellationToken = default)
     {
-        var entity = await _db.FitatuSessions
+        var entities = await _db.FitatuSessions
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var entity = entities
             .OrderByDescending(x => x.UpdatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefault();
 
         if (entity is null)
         {
