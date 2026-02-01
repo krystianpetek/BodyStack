@@ -20,9 +20,12 @@ public class Program
 
         builder.Services.AddScoped<Infrastructure.Security.ITokenProtector, Infrastructure.Security.TokenProtector>();
         builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
+        builder.Services.AddScoped<Application.Fitatu.IMonthDaySummaryRepository, Infrastructure.Persistence.MonthDaySummaryRepository>();
         builder.Services.AddScoped<Application.Fitatu.FitatuLoginUseCase>();
         builder.Services.AddScoped<Application.Fitatu.FitatuGetDayUseCase>();
         builder.Services.AddScoped<Application.Fitatu.FitatuStartMonthRecalculationUseCase>();
+        builder.Services.AddScoped<Application.Fitatu.FitatuExportDayCsvUseCase>();
+        builder.Services.AddScoped<Application.Fitatu.FitatuExportMonthCsvUseCase>();
 
         builder.Services.AddSingleton<Domain.Fitatu.FitatuDayPlanTotalsCalculator>();
 
@@ -109,6 +112,38 @@ public class Program
                 return Results.Accepted();
             })
             .WithName("FitatuRecalculateMonth");
+
+        app.MapGet("/api/fitatu/export/day/{date}", async (
+                string date,
+                Application.Fitatu.FitatuExportDayCsvUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var day))
+                {
+                    return Results.BadRequest(new { error = "Invalid date format. Expected yyyy-MM-dd." });
+                }
+
+                var csv = await useCase.ExecuteAsync(day, cancellationToken);
+                return Results.Text(csv, "text/csv");
+            })
+            .WithName("FitatuExportDayCsv");
+
+        app.MapGet("/api/fitatu/export/month/{yearMonth}", async (
+                string yearMonth,
+                Application.Fitatu.FitatuExportMonthCsvUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var csv = await useCase.ExecuteAsync(yearMonth, cancellationToken);
+                    return Results.Text(csv, "text/csv");
+                }
+                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Month export requires computed days.", StringComparison.Ordinal))
+                {
+                    return Results.Conflict(new { error = ex.Message });
+                }
+            })
+            .WithName("FitatuExportMonthCsv");
 
         var summaries = new[]
         {
