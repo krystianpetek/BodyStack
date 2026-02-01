@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 
 namespace BodyStack.Server;
 
@@ -9,6 +10,15 @@ public class Program
 
         // Add services to the container.
         builder.Services.AddAuthorization();
+
+        builder.Services.AddDataProtection();
+
+        builder.Services.AddDbContext<Infrastructure.Persistence.AppDbContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+
+        builder.Services.AddScoped<Infrastructure.Security.ITokenProtector, Infrastructure.Security.TokenProtector>();
+        builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
+        builder.Services.AddScoped<Application.Fitatu.FitatuLoginUseCase>();
 
         builder.Services.AddOptions<Integrations.Fitatu.FitatuOptions>()
             .Bind(builder.Configuration.GetSection("Fitatu"))
@@ -29,6 +39,12 @@ public class Program
 
         var app = builder.Build();
 
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
+            db.Database.EnsureCreated();
+        }
+
         app.UseDefaultFiles();
         app.MapStaticAssets();
 
@@ -41,6 +57,16 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
+
+        app.MapPost("/api/fitatu/login", async (
+                Api.Fitatu.FitatuLoginRequest request,
+                Application.Fitatu.FitatuLoginUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                await useCase.ExecuteAsync(request.Username, request.Password, cancellationToken);
+                return TypedResults.Ok(new Api.Fitatu.FitatuLoginResponse("ok"));
+            })
+            .WithName("FitatuLogin");
 
         var summaries = new[]
         {

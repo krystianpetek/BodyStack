@@ -4,4 +4,5 @@
     <Deploy />
   </Project>
   <Project Path="BodyStack.Server/BodyStack.Server.csproj" />
+  <Project Path="BodyStack.Server.Tests/BodyStack.Server.Tests.csproj" />
 </Solution>
