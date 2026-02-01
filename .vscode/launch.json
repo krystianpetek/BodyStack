@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Containers .NET Attach (Preview)",
+            "type": "docker",
+            "request": "attach",
+            "platform": "netCore",
+            "sourceFileMap": {
+                "/src": "${workspaceFolder}"
+            }
+        },
+        {
+            "type": "edge",
+            "request": "launch",
+            "name": "localhost (Edge)",
+            "url": "https://localhost:51618",
+            "webRoot": "${workspaceFolder}"
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "localhost (Chrome)",
+            "url": "https://localhost:51618",
+            "webRoot": "${workspaceFolder}"
+        }
+    ]
+}

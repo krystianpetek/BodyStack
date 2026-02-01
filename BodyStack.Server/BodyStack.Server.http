@@ -1,0 +1,6 @@
+@BodyStack.Server_HostAddress = http://localhost:5072
+
+GET {{BodyStack.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

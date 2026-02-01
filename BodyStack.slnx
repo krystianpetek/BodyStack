@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="bodystack.client/bodystack.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="BodyStack.Server/BodyStack.Server.csproj" />
+</Solution>
