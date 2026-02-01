@@ -10,6 +10,20 @@ public class Program
         // Add services to the container.
         builder.Services.AddAuthorization();
 
+        builder.Services.AddOptions<Integrations.Fitatu.FitatuOptions>()
+            .Bind(builder.Configuration.GetSection("Fitatu"))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.BaseUrl), "Fitatu:BaseUrl is required")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey), "Fitatu:ApiKey is required")
+            .ValidateOnStart();
+
+        builder.Services.AddHttpClient<Integrations.Fitatu.IFitatuClient, Integrations.Fitatu.FitatuClient>((sp, httpClient) =>
+        {
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Integrations.Fitatu.FitatuOptions>>().Value;
+            httpClient.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+        });
+
+        builder.Services.AddSingleton<Security.JwtParser>();
+
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
