@@ -49,8 +49,8 @@ public class Program
 
         app.MapFallbackToFile("/index.html");
 
-        app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
-        app.MapGet("/api/hello", () => Results.Ok(new { message = "Hello from API" }));
+        app.MapGet("/api/health", () => TypedResults.Ok(new { status = "ok" }))
+        .WithName("GetHealth");
 
         app.Run();
     }

@@ -1,0 +1,44 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-dotnet",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "BodyStack.Server/BodyStack.Server.csproj"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "dev-client",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "dev"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/bodystack.client"
+            },
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "owner": "custom",
+                    "pattern": [
+                        {
+                            "regexp": ".*"
+                        }
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^\\s*VITE\\s+v",
+                        "endsPattern": "ready in"
+                    }
+                }
+            ]
+        }
+    ]
+}

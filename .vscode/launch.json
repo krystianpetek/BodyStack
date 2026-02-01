@@ -1,18 +1,41 @@
 {
     "version": "0.2.0",
-    "configurations": [
+    "compounds": [
         {
-            "type": "chrome",
-            "request": "launch",
-            "name": "localhost (Chrome)",
-            "url": "https://localhost:51618",
-            "webRoot": "${workspaceFolder}"
-        },
+            "name": "Full Stack: .NET + React",
+            "configurations": [
+                ".NET Core Launch",
+                "React (Vite) (Chrome)"
+            ]
+        }
+    ],
+    "configurations": [
         {
             "name": "C#: BodyStack.Server Debug",
             "type": "dotnet",
             "request": "launch",
             "projectPath": "${workspaceFolder}/BodyStack.Server/BodyStack.Server.csproj"
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "React (Vite) (Chrome)",
+            "url": "https://localhost:53559",
+            "webRoot": "${workspaceFolder}/bodystack.client"
+        },
+        {
+            "name": ".NET Core Launch",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-dotnet",
+            "program": "${workspaceFolder}/BodyStack.Server/bin/Debug/net10.0/BodyStack.Server.dll",
+            "args": [],
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": "Microsoft.AspNetCore.SpaProxy",
+                "ASPNETCORE_URLS": "https://localhost:7225;http://localhost:5072",
+                "ASPNETCORE_HTTPS_PORT": "7225"
+            }
         }
     ]
 }
