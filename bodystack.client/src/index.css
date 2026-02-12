@@ -1,68 +1,108 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import "tailwindcss";
+@import "react-day-picker/style.css";
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer components {
+  .rdp {
+    @apply text-slate-900 dark:text-slate-100;
   }
-  a:hover {
-    color: #747bff;
+
+  .rdp-months {
+    @apply flex flex-col;
   }
-  button {
-    background-color: #f9f9f9;
+
+  .rdp-month {
+    @apply w-full;
+  }
+
+  .rdp-caption {
+    @apply flex items-center justify-between px-2 py-2;
+  }
+
+  .rdp-caption_label {
+    @apply text-sm font-semibold !text-slate-900 dark:!text-slate-100;
+  }
+
+  .rdp-nav {
+    @apply flex items-center gap-1;
+  }
+
+  .rdp-button_previous,
+  .rdp-button_next {
+    @apply h-9 w-9 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40;
+    @apply dark:border-slate-700 dark:bg-slate-800 dark:!text-slate-100 dark:hover:bg-slate-700 dark:focus-visible:ring-slate-500/40;
+  }
+
+  /* KEY FIX: real 7-column grid */
+  .rdp-month_grid {
+    @apply w-full border-collapse;
+    table-layout: fixed;
+  }
+
+  .rdp-weekdays {
+    @apply table-header-group;
+  }
+
+  .rdp-weekdays_row,
+  .rdp-week {
+    @apply table-row;
+  }
+
+  .rdp-weekday,
+  .rdp-day {
+    @apply table-cell p-0 text-center align-middle;
+  }
+
+  .rdp-weekday {
+    @apply pb-2 text-[11px] font-medium text-slate-500 dark:text-slate-400;
+  }
+
+  .rdp-day_button {
+    @apply mx-auto flex h-10 w-10 items-center justify-center rounded-xl text-sm font-medium;
+    @apply text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40;
+    @apply dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500/40;
+  }
+
+  .rdp-selected .rdp-day_button {
+    @apply !bg-slate-900 !text-white hover:!bg-slate-900;
+    @apply dark:!bg-slate-100 dark:!text-slate-900 dark:hover:!bg-slate-100;
+  }
+
+  .rdp-today .rdp-day_button {
+    @apply ring-1 ring-slate-300 dark:ring-slate-700;
+  }
+
+  .rdp-outside .rdp-day_button {
+    @apply text-slate-400 dark:text-slate-600;
+  }
+
+  .rdp-disabled .rdp-day_button {
+    @apply opacity-40;
+  }
+
+  /* Status modifiers - LIGHTER colors for better visibility */
+  .rdp-day.rdp-ready .rdp-day_button {
+    @apply bg-emerald-200 text-emerald-900;
+    @apply dark:bg-emerald-800 dark:text-emerald-100;
+  }
+
+  .rdp-day.rdp-pending .rdp-day_button {
+    @apply bg-amber-200 text-amber-900;
+    @apply dark:bg-amber-800 dark:text-amber-100;
+  }
+
+  .rdp-day.rdp-error .rdp-day_button {
+    @apply bg-rose-200 text-rose-900;
+    @apply dark:bg-rose-800 dark:text-rose-100;
   }
 }

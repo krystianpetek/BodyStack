@@ -361,3 +361,28 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+.opencode/command/opsx-apply.md
+.opencode/command/opsx-archive.md
+.opencode/command/opsx-bulk-archive.md
+.opencode/command/opsx-continue.md
+.opencode/command/opsx-explore.md
+.opencode/command/opsx-ff.md
+.opencode/command/opsx-new.md
+.opencode/command/opsx-onboard.md
+.opencode/command/opsx-sync.md
+.opencode/command/opsx-verify.md
+.opencode/skills/openspec-apply-change/SKILL.md
+.opencode/skills/openspec-archive-change/SKILL.md
+.opencode/skills/openspec-bulk-archive-change/SKILL.md
+.opencode/skills/openspec-continue-change/SKILL.md
+.opencode/skills/openspec-explore/SKILL.md
+.opencode/skills/openspec-ff-change/SKILL.md
+.opencode/skills/openspec-new-change/SKILL.md
+.opencode/skills/openspec-onboard/SKILL.md
+.opencode/skills/openspec-sync-specs/SKILL.md
+.opencode/skills/openspec-verify-change/SKILL.md
+assets/activity.ndjson.gz
+assets/diet-and-activity.json
+assets/sleep_stages.ndjson.gz
+assets/sleep.ndjson.gz
+assets/Zrzut ekranu 2026-02-11 193346.png
