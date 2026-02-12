@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bodystack-postgres
+    environment:
+      POSTGRES_DB: bodystack
+      POSTGRES_USER: bodystack_user
+      POSTGRES_PASSWORD: bodystack_pass
+    ports:
+      - "12334:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bodystack_user -d bodystack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
