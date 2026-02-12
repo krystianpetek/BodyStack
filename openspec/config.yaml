@@ -1,0 +1,72 @@
+schema: spec-driven
+
+# Project context
+context: |
+  ## Project Description
+  Personal health dashboard aggregating nutrition and fitness data
+
+  ## Tech Stack
+  - Backend: .NET 10 (ASP.NET Core Web), C# 13
+  - Frontend: React 19, TypeScript 5.9, Vite 7, Tailwind CSS v4
+  - Database: SQLite with Entity Framework Core 10
+  - Real-time: SignalR for background job progress updates
+  - Authentication: JWT tokens with data protection
+  
+  ## Architecture
+  - Clean Architecture with separation:
+    - Api: Minimal API endpoints, request/response DTOs
+    - Application: Use cases, repositories interfaces
+    - Domain: Business logic, calculators, models
+    - Infrastructure: Persistence (EF Core), security, background workers
+    - Integrations: External API clients (Fitatu, Suunto)
+  - Frontend structure:
+    - pages: Route-level components
+    - components: Reusable UI components
+    - landing: Marketing/landing page sections
+    - providers: Context providers
+
+  ## Domain
+  - Integrates with Fitatu API (nutrition tracking app)
+    - Daily meal plans with calories/protein/carbs/fat
+    - Month recalculation with background processing
+    - CSV export for days and months
+  - Integrates with Suunto API (fitness/sleep tracking)
+    - Daily activity summary (steps, energy, heart rate, HRV)
+    - Daily sleep summary (total sleep, night sleep, naps)
+  
+  ## Conventions
+  - C#: Nullable enabled, implicit usings, file-scoped namespaces
+  - React: Functional components, hooks, TypeScript strict mode
+  - Database: Entity Framework with migrations
+  - API: Minimal API pattern with typed endpoints
+  
+  ## Testing
+  - xUnit for backend unit tests
+  - Test project: BodyStack.Server.Tests
+  - REQUIREMENT: All features must have corresponding tests
+  - Test naming: `[ClassName]Tests.cs` matching the class under test
+  - Test methods: Use descriptive names explaining the scenario
+  - Coverage focus: Domain logic, use cases, API endpoints, integrations
+
+# Per-artifact rules
+rules:
+  proposal:
+    - Keep proposals concise and focused on single features
+    - Include API contracts and data flow diagrams where applicable
+    - Consider both sync and background processing patterns
+  
+  tasks:
+    - Break backend work into: API endpoint → Application use case → Domain logic → Infrastructure → Tests
+    - Break frontend work into: Page → Components → API integration → State management → Tests
+    - Include SignalR hub updates when background jobs are involved
+    - Every task list must include test creation for the implemented feature
+  
+  specification:
+    - Define request/response DTOs explicitly
+    - Document external API dependencies and their contracts
+    - Include error scenarios and HTTP status codes
+  
+  reflection:
+    - Review integration points with external APIs (Fitatu/Suunto)
+    - Consider caching strategies for expensive operations
+    - Evaluate background job queue handling
