@@ -1,3 +1,4 @@
+using BodyStack.Server.Domain.Exceptions;
 using BodyStack.Server.Infrastructure.Background;
 
 namespace BodyStack.Server.Application.Fitatu;
@@ -25,7 +26,7 @@ public sealed class FitatuStartMonthRecalculationUseCase
         var session = await _sessions.GetLatestAsync(cancellationToken);
         if (session is null)
         {
-            throw new InvalidOperationException("Fitatu session not found. Please login first.");
+            throw new FitatuSessionNotFoundException(null);
         }
 
         await _queue.QueueAsync(new FitatuMonthRecalculationRequest(session.FitatuUserId, yearMonth), cancellationToken);

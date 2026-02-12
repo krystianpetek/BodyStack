@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using BodyStack.Server.Domain.Exceptions;
 
 namespace BodyStack.Server.Application.Fitatu;
 
@@ -67,7 +68,7 @@ public sealed class FitatuExportDayCsvUseCase
         var session = await _sessions.GetLatestAsync(cancellationToken);
         if (session is null)
         {
-            throw new InvalidOperationException("Fitatu session not found. Please login first.");
+            throw new FitatuSessionNotFoundException(null);
         }
 
         var dateString = date.ToString("yyyy-MM-dd");
@@ -106,7 +107,7 @@ public sealed class FitatuExportMonthCsvUseCase
         var session = await _sessions.GetLatestAsync(cancellationToken);
         if (session is null)
         {
-            throw new InvalidOperationException("Fitatu session not found. Please login first.");
+            throw new FitatuSessionNotFoundException(null);
         }
 
         if (!TryParseYearMonth(yearMonth, out var year, out var month))
@@ -124,10 +125,10 @@ public sealed class FitatuExportMonthCsvUseCase
             .Where(r => string.Equals(r.Status, MonthDaySummaryStatus.Ready, StringComparison.Ordinal))
             .ToDictionary(r => r.Date, r => r);
 
-        var missing = expectedDates.Where(d => !ready.ContainsKey(d)).ToArray();
-        if (missing.Length > 0)
+        var missing = expectedDates.Where(d => !ready.ContainsKey(d)).ToList();
+        if (missing.Count > 0)
         {
-            throw new InvalidOperationException($"Month export requires computed days. Missing: {string.Join(',', missing)}");
+            throw new MonthExportIncompleteException(year, month, missing);
         }
 
         var csvRows = expectedDates

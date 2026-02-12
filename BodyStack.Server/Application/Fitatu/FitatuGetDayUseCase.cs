@@ -1,3 +1,4 @@
+using BodyStack.Server.Domain.Exceptions;
 using BodyStack.Server.Domain.Fitatu;
 using BodyStack.Server.Integrations.Fitatu;
 
@@ -25,7 +26,7 @@ public sealed class FitatuGetDayUseCase
 
         if (session is null)
         {
-            throw new InvalidOperationException("Fitatu session not found. Please login first.");
+            throw new FitatuSessionNotFoundException(null);
         }
 
         using var dayJson = await _fitatuClient.GetDietAndActivityPlanDayAsync(session.FitatuUserId, date, session.Token, cancellationToken);

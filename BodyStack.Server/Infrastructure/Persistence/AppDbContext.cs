@@ -18,6 +18,8 @@ public sealed class AppDbContext : DbContext
         {
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.FitatuUserId).IsUnique();
+            // Index for GetLatestAsync query optimization
+            entity.HasIndex(x => x.UpdatedAt);
             entity.Property(x => x.FitatuUserId).IsRequired();
             entity.Property(x => x.TokenProtected).IsRequired();
             entity.Property(x => x.RefreshTokenProtected).IsRequired();
@@ -31,6 +33,13 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.FitatuUserId).IsRequired();
             entity.Property(x => x.YearMonth).IsRequired();
             entity.Property(x => x.Date).IsRequired();
+            entity.Property(x => x.Energy).HasPrecision(18, 2);
+            entity.Property(x => x.Protein).HasPrecision(18, 2);
+            entity.Property(x => x.Fat).HasPrecision(18, 2);
+            entity.Property(x => x.Carbohydrate).HasPrecision(18, 2);
+            entity.Property(x => x.Fiber).HasPrecision(18, 2);
+            entity.Property(x => x.Sugars).HasPrecision(18, 2);
+            entity.Property(x => x.Salt).HasPrecision(18, 2);
             entity.Property(x => x.Status).IsRequired();
             entity.Property(x => x.UpdatedAt).IsRequired();
         });

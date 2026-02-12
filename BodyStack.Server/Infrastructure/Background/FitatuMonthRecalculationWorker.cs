@@ -46,13 +46,13 @@ public sealed class FitatuMonthRecalculationWorker : BackgroundService
         var session = await sessions.GetByFitatuUserIdAsync(request.FitatuUserId, cancellationToken);
         if (session is null)
         {
-            await _hub.Clients.All.SendAsync("Progress", new { done = 0, total = 0, error = "Fitatu session not found. Please login first." }, cancellationToken);
+            await _hub.Clients.Group($"user-{request.FitatuUserId}").SendAsync("Progress", new { done = 0, total = 0, error = "Fitatu session not found. Please login first." }, cancellationToken);
             return;
         }
 
         if (!TryParseYearMonth(request.YearMonth, out var year, out var month))
         {
-            await _hub.Clients.All.SendAsync("Progress", new { done = 0, total = 0, error = "Invalid YearMonth format. Expected YYYY-MM." }, cancellationToken);
+            await _hub.Clients.Group($"user-{request.FitatuUserId}").SendAsync("Progress", new { done = 0, total = 0, error = "Invalid YearMonth format. Expected YYYY-MM." }, cancellationToken);
             return;
         }
 
@@ -74,15 +74,15 @@ public sealed class FitatuMonthRecalculationWorker : BackgroundService
                 await UpsertReadyAsync(db, session.FitatuUserId, request.YearMonth, date, computed.Totals, cancellationToken);
 
                 done++;
-                await _hub.Clients.All.SendAsync("DayReady", new { date }, cancellationToken);
-                await _hub.Clients.All.SendAsync("Progress", new { done, total = totalDays }, cancellationToken);
+                await _hub.Clients.Group($"user-{request.FitatuUserId}").SendAsync("DayReady", new { date }, cancellationToken);
+                await _hub.Clients.Group($"user-{request.FitatuUserId}").SendAsync("Progress", new { done, total = totalDays }, cancellationToken);
             }
             catch (Exception ex)
             {
                 await UpsertStatusAsync(db, session.FitatuUserId, request.YearMonth, date, MonthDaySummaryStatus.Error, ex.Message, cancellationToken);
 
                 done++;
-                await _hub.Clients.All.SendAsync("Progress", new { done, total = totalDays }, cancellationToken);
+                await _hub.Clients.Group($"user-{request.FitatuUserId}").SendAsync("Progress", new { done, total = totalDays }, cancellationToken);
             }
         }
     }

@@ -2,6 +2,7 @@ using BodyStack.Server.Application.Fitatu;
 using BodyStack.Server.Infrastructure.Persistence.Entities;
 using BodyStack.Server.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Linq;
 
 namespace BodyStack.Server.Infrastructure.Persistence;
@@ -10,11 +11,23 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
 {
     private readonly AppDbContext _db;
     private readonly ITokenProtector _tokenProtector;
+    private readonly ILogger<FitatuSessionRepository> _logger;
+    private const int SlowQueryThresholdMs = 100;
 
-    public FitatuSessionRepository(AppDbContext db, ITokenProtector tokenProtector)
+    public FitatuSessionRepository(AppDbContext db, ITokenProtector tokenProtector, ILogger<FitatuSessionRepository> logger)
     {
         _db = db;
         _tokenProtector = tokenProtector;
+        _logger = logger;
+    }
+
+    private void LogSlowQuery(string operationName, long elapsedMs)
+    {
+        if (elapsedMs > SlowQueryThresholdMs)
+        {
+            _logger.LogWarning("Slow query detected in {OperationName}: {ElapsedMs}ms (threshold: {ThresholdMs}ms)",
+                operationName, elapsedMs, SlowQueryThresholdMs);
+        }
     }
 
     public async Task UpsertAsync(string fitatuUserId, string token, string refreshToken, CancellationToken cancellationToken = default)
@@ -65,7 +78,12 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
             throw new ArgumentException("FitatuUserId is required.", nameof(fitatuUserId));
         }
 
+        var stopwatch = Stopwatch.StartNew();
+
         var entity = await _db.FitatuSessions.SingleOrDefaultAsync(x => x.FitatuUserId == fitatuUserId, cancellationToken);
+
+        stopwatch.Stop();
+        LogSlowQuery(nameof(GetByFitatuUserIdAsync), stopwatch.ElapsedMilliseconds);
 
         if (entity is null)
         {
@@ -81,13 +99,15 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
 
     public async Task<FitatuSessionDto?> GetLatestAsync(CancellationToken cancellationToken = default)
     {
-        var entities = await _db.FitatuSessions
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
 
-        var entity = entities
+        var entity = await _db.FitatuSessions
+            .AsNoTracking()
             .OrderByDescending(x => x.UpdatedAt)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
+
+        stopwatch.Stop();
+        LogSlowQuery(nameof(GetLatestAsync), stopwatch.ElapsedMilliseconds);
 
         if (entity is null)
         {
@@ -99,5 +119,11 @@ public sealed class FitatuSessionRepository : IFitatuSessionRepository
             _tokenProtector.Unprotect(entity.TokenProtected),
             _tokenProtector.Unprotect(entity.RefreshTokenProtected),
             entity.UpdatedAt);
+    }
+
+    public async Task ClearAsync(CancellationToken cancellationToken = default)
+    {
+        _db.FitatuSessions.RemoveRange(_db.FitatuSessions);
+        await _db.SaveChangesAsync(cancellationToken);
     }
 }

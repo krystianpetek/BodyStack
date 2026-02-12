@@ -7,6 +7,8 @@ public interface IFitatuSessionRepository
     Task<FitatuSessionDto?> GetByFitatuUserIdAsync(string fitatuUserId, CancellationToken cancellationToken = default);
 
     Task<FitatuSessionDto?> GetLatestAsync(CancellationToken cancellationToken = default);
+
+    Task ClearAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record FitatuSessionDto(string FitatuUserId, string Token, string RefreshToken, DateTimeOffset UpdatedAt);

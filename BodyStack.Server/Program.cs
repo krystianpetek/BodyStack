@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using BodyStack.Server.Domain.Exceptions;
 
 namespace BodyStack.Server;
 
@@ -15,12 +16,14 @@ public class Program
         // Add services to the container.
         builder.Services.AddAuthorization();
 
+        builder.Services.AddMemoryCache();
+
         builder.Services.AddSignalR();
 
         builder.Services.AddDataProtection();
 
         builder.Services.AddDbContext<Infrastructure.Persistence.AppDbContext>(options =>
-            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+            options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
         builder.Services.AddScoped<Infrastructure.Security.ITokenProtector, Infrastructure.Security.TokenProtector>();
         builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
@@ -49,6 +52,19 @@ public class Program
         });
 
         builder.Services.AddSingleton<Security.JwtParser>();
+
+        builder.Services.AddHttpClient<Integrations.Suunto.ISuuntoActivityExportClient, Integrations.Suunto.SuuntoActivityExportClient>(httpClient =>
+        {
+            httpClient.BaseAddress = new Uri("https://247.sports-tracker.com", UriKind.Absolute);
+        });
+
+        builder.Services.AddHttpClient<Integrations.Suunto.ISuuntoSleepExportClient, Integrations.Suunto.SuuntoSleepExportClient>(httpClient =>
+        {
+            httpClient.BaseAddress = new Uri("https://247.sports-tracker.com", UriKind.Absolute);
+        });
+
+        builder.Services.AddScoped<Application.Suunto.SuuntoGetDailyActivitySummaryUseCase>();
+        builder.Services.AddScoped<Application.Suunto.SuuntoGetDailySleepSummaryUseCase>();
 
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
@@ -111,6 +127,15 @@ public class Program
             })
             .WithName("FitatuLogin");
 
+        app.MapPost("/api/fitatu/logout", async (
+                Application.Fitatu.IFitatuSessionRepository repository,
+                CancellationToken cancellationToken) =>
+            {
+                await repository.ClearAsync(cancellationToken);
+                return TypedResults.Ok(new { status = "ok" });
+            })
+            .WithName("FitatuLogout");
+
         app.MapGet("/api/fitatu/day/{date}", async (
                 string date,
                 Application.Fitatu.FitatuGetDayUseCase useCase,
@@ -132,7 +157,7 @@ public class Program
 
                     return Results.Ok(response);
                 }
-                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                catch (FitatuSessionNotFoundException)
                 {
                     return Results.Unauthorized();
                 }
@@ -153,9 +178,13 @@ public class Program
                     await useCase.ExecuteAsync(yearMonth, cancellationToken);
                     return Results.Accepted();
                 }
-                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                catch (FitatuSessionNotFoundException)
                 {
                     return Results.Unauthorized();
+                }
+                catch (MonthExportIncompleteException ex)
+                {
+                    return Results.Conflict(new { error = ex.Message, missingDays = ex.MissingDays });
                 }
                 catch (ArgumentException ex)
                 {
@@ -167,6 +196,43 @@ public class Program
                 }
             })
             .WithName("FitatuRecalculateMonth");
+
+        app.MapGet("/api/fitatu/month/{yearMonth}/statuses", async (
+                string yearMonth,
+                Application.Fitatu.IFitatuSessionRepository sessionRepository,
+                Application.Fitatu.IMonthDaySummaryRepository summaryRepository,
+                CancellationToken cancellationToken) =>
+            {
+                var session = await sessionRepository.GetLatestAsync(cancellationToken);
+                if (session is null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                try
+                {
+                    var summaries = await summaryRepository.GetByYearMonthAsync(session.FitatuUserId, yearMonth, cancellationToken);
+                    var statuses = summaries.Select(s => new
+                    {
+                        date = s.Date,
+                        status = s.Status.ToLowerInvariant(),
+                        energy = s.Energy,
+                        protein = s.Protein,
+                        fat = s.Fat,
+                        carbohydrate = s.Carbohydrate,
+                        fiber = s.Fiber,
+                        sugars = s.Sugars,
+                        salt = s.Salt
+                    }).ToList();
+
+                    return Results.Ok(new { statuses });
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            })
+            .WithName("FitatuGetMonthStatuses");
 
         app.MapGet("/api/fitatu/export/day/{date}", async (
                 string date,
@@ -183,7 +249,7 @@ public class Program
                     var csv = await useCase.ExecuteAsync(day, cancellationToken);
                     return Results.Text(csv, "text/csv");
                 }
-                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                catch (FitatuSessionNotFoundException)
                 {
                     return Results.Unauthorized();
                 }
@@ -200,11 +266,11 @@ public class Program
                     var csv = await useCase.ExecuteAsync(yearMonth, cancellationToken);
                     return Results.Text(csv, "text/csv");
                 }
-                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Month export requires computed days.", StringComparison.Ordinal))
+                catch (MonthExportIncompleteException ex)
                 {
-                    return Results.Conflict(new { error = ex.Message });
+                    return Results.Conflict(new { error = ex.Message, missingDays = ex.MissingDays });
                 }
-                catch (InvalidOperationException ex) when (ex.Message.StartsWith("Fitatu session not found", StringComparison.Ordinal))
+                catch (FitatuSessionNotFoundException)
                 {
                     return Results.Unauthorized();
                 }
@@ -215,29 +281,121 @@ public class Program
             })
             .WithName("FitatuExportMonthCsv");
 
-        var summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
-        app.MapGet("/weatherforecast", (HttpContext httpContext) =>
-        {
-            var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                {
-                    Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    TemperatureC = Random.Shared.Next(-20, 55),
-                    Summary = summaries[Random.Shared.Next(summaries.Length)]
-                })
-                .ToArray();
-            return forecast;
-        })
-        .WithName("GetWeatherForecast");
-
         app.MapFallbackToFile("/index.html");
 
         app.MapGet("/api/health", () => TypedResults.Ok(new { status = "ok" }))
         .WithName("GetHealth");
+
+        app.MapGet("/api/suunto/activity/daily", async (
+                HttpRequest request,
+                string? from,
+                string? to,
+                int? ttlMinutes,
+                Application.Suunto.SuuntoGetDailyActivitySummaryUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
+                {
+                    return Results.Unauthorized();
+                }
+
+                DateOnly? fromDate = null;
+                DateOnly? toDate = null;
+
+                if (!string.IsNullOrWhiteSpace(from))
+                {
+                    if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", out var parsedFrom))
+                    {
+                        return Results.BadRequest(new { error = "Invalid from date format. Expected yyyy-MM-dd." });
+                    }
+                    fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrWhiteSpace(to))
+                {
+                    if (!DateOnly.TryParseExact(to, "yyyy-MM-dd", out var parsedTo))
+                    {
+                        return Results.BadRequest(new { error = "Invalid to date format. Expected yyyy-MM-dd." });
+                    }
+                    toDate = parsedTo;
+                }
+
+                var ttl = TimeSpan.FromMinutes(ttlMinutes.GetValueOrDefault(15));
+                if (ttl < TimeSpan.FromMinutes(1)) ttl = TimeSpan.FromMinutes(1);
+                if (ttl > TimeSpan.FromHours(24)) ttl = TimeSpan.FromHours(24);
+
+                var days = await useCase.ExecuteAsync(authHeader.ToString(), ttl, fromDate, toDate, cancellationToken);
+
+                var responseDays = days
+                    .Select(d => new Api.Suunto.SuuntoDailyActivityResponse(d.Date, d.Steps, d.EnergyConsumption, d.AvgHr, d.AvgHrv, d.Samples))
+                    .ToArray();
+
+                var response = new Api.Suunto.SuuntoDailyActivitySummaryResponse(
+                    Days: responseDays,
+                    TotalSteps: responseDays.Sum(d => d.Steps),
+                    TotalEnergyConsumption: responseDays.Sum(d => d.EnergyConsumption));
+
+                return Results.Ok(response);
+            })
+            .WithName("SuuntoActivityDaily");
+
+        app.MapGet("/api/suunto/sleep/daily", async (
+                HttpRequest request,
+                string? from,
+                string? to,
+                int? ttlMinutes,
+                Application.Suunto.SuuntoGetDailySleepSummaryUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
+                {
+                    return Results.Unauthorized();
+                }
+
+                DateOnly? fromDate = null;
+                DateOnly? toDate = null;
+
+                if (!string.IsNullOrWhiteSpace(from))
+                {
+                    if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", out var parsedFrom))
+                    {
+                        return Results.BadRequest(new { error = "Invalid from date format. Expected yyyy-MM-dd." });
+                    }
+                    fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrWhiteSpace(to))
+                {
+                    if (!DateOnly.TryParseExact(to, "yyyy-MM-dd", out var parsedTo))
+                    {
+                        return Results.BadRequest(new { error = "Invalid to date format. Expected yyyy-MM-dd." });
+                    }
+                    toDate = parsedTo;
+                }
+
+                var ttl = TimeSpan.FromMinutes(ttlMinutes.GetValueOrDefault(15));
+                if (ttl < TimeSpan.FromMinutes(1)) ttl = TimeSpan.FromMinutes(1);
+                if (ttl > TimeSpan.FromHours(24)) ttl = TimeSpan.FromHours(24);
+
+                var days = await useCase.ExecuteAsync(authHeader.ToString(), ttl, fromDate, toDate, cancellationToken);
+
+                var responseDays = days
+                    .Select(d => new Api.Suunto.SuuntoDailySleepResponse(
+                        d.Date,
+                        d.TotalSleepSeconds,
+                        d.NightSleepSeconds,
+                        d.NapSleepSeconds,
+                        d.SleepSessionsCount,
+                        d.NapSessionsCount))
+                    .ToArray();
+
+                var response = new Api.Suunto.SuuntoDailySleepSummaryResponse(
+                    Days: responseDays,
+                    TotalSleepSeconds: responseDays.Sum(d => d.TotalSleepSeconds));
+
+                return Results.Ok(response);
+            })
+            .WithName("SuuntoSleepDaily");
 
         app.Run();
     }
