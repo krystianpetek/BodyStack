@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using BodyStack.Server.Application.Fitatu;
 using BodyStack.Server.Domain.Fitatu;
 using BodyStack.Server.Infrastructure.Persistence;
@@ -68,7 +70,10 @@ public sealed class FitatuMonthRecalculationWorker : BackgroundService
 
             try
             {
-                using var json = await fitatuClient.GetDietAndActivityPlanDayAsync(session.FitatuUserId, dateOnly, session.Token, cancellationToken);
+                using var json = await fitatuClient.GetDietAndActivityPlanDayAsync(session.FitatuUserId, dateOnly, session.Token, cancellationToken)
+                .FirstAsync()
+                .ToTask(cancellationToken);
+
                 var computed = calculator.Compute(json);
 
                 await UpsertReadyAsync(db, session.FitatuUserId, request.YearMonth, date, computed.Totals, cancellationToken);

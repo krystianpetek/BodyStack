@@ -1,3 +1,4 @@
+using System.Reactive.Linq;
 using BodyStack.Server.Integrations.Fitatu;
 using BodyStack.Server.Security;
 
