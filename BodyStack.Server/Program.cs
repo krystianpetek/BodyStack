@@ -1,5 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using BodyStack.Server.Domain.Exceptions;
+using BodyStack.Server.Integrations.Fitatu;
+using Microsoft.Extensions.Options;
+using BodyStack.Server.Infrastructure.Background;
+using BodyStack.Server.Application.Fitatu;
+using BodyStack.Server.Infrastructure.Security;
+using BodyStack.Server.Infrastructure.Persistence;
+using BodyStack.Server.Application.Suunto;
+using BodyStack.Server.Integrations.Suunto;
+using BodyStack.Server.Security;
 
 namespace BodyStack.Server;
 
@@ -22,49 +31,49 @@ public class Program
 
         builder.Services.AddDataProtection();
 
-        builder.Services.AddDbContext<Infrastructure.Persistence.AppDbContext>(options =>
+        builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-        builder.Services.AddScoped<Infrastructure.Security.ITokenProtector, Infrastructure.Security.TokenProtector>();
-        builder.Services.AddScoped<Application.Fitatu.IFitatuSessionRepository, Infrastructure.Persistence.FitatuSessionRepository>();
-        builder.Services.AddScoped<Application.Fitatu.IMonthDaySummaryRepository, Infrastructure.Persistence.MonthDaySummaryRepository>();
-        builder.Services.AddScoped<Application.Fitatu.FitatuLoginUseCase>();
-        builder.Services.AddScoped<Application.Fitatu.FitatuGetDayUseCase>();
-        builder.Services.AddScoped<Application.Fitatu.FitatuStartMonthRecalculationUseCase>();
-        builder.Services.AddScoped<Application.Fitatu.FitatuExportDayCsvUseCase>();
-        builder.Services.AddScoped<Application.Fitatu.FitatuExportMonthCsvUseCase>();
+        builder.Services.AddScoped<ITokenProtector, TokenProtector>();
+        builder.Services.AddScoped<IFitatuSessionRepository, FitatuSessionRepository>();
+        builder.Services.AddScoped<IMonthDaySummaryRepository, MonthDaySummaryRepository>();
+        builder.Services.AddScoped<FitatuLoginUseCase>();
+        builder.Services.AddScoped<FitatuGetDayUseCase>();
+        builder.Services.AddScoped<FitatuStartMonthRecalculationUseCase>();
+        builder.Services.AddScoped<FitatuExportDayCsvUseCase>();
+        builder.Services.AddScoped<FitatuExportMonthCsvUseCase>();
 
         builder.Services.AddSingleton<Domain.Fitatu.FitatuDayPlanTotalsCalculator>();
 
-        builder.Services.AddSingleton<Infrastructure.Background.IBackgroundTaskQueue<Application.Fitatu.FitatuMonthRecalculationRequest>, Infrastructure.Background.BackgroundTaskQueue<Application.Fitatu.FitatuMonthRecalculationRequest>>();
-        builder.Services.AddHostedService<Infrastructure.Background.FitatuMonthRecalculationWorker>();
+        builder.Services.AddSingleton<IBackgroundTaskQueue<FitatuMonthRecalculationRequest>, BackgroundTaskQueue<FitatuMonthRecalculationRequest>>();
+        builder.Services.AddHostedService<FitatuMonthRecalculationWorker>();
 
-        builder.Services.AddOptions<Integrations.Fitatu.FitatuOptions>()
+        builder.Services.AddOptions<FitatuOptions>()
             .Bind(builder.Configuration.GetSection("Fitatu"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.BaseUrl), "Fitatu:BaseUrl is required")
             .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey), "Fitatu:ApiKey is required")
             .ValidateOnStart();
 
-        builder.Services.AddHttpClient<Integrations.Fitatu.IFitatuClient, Integrations.Fitatu.FitatuClient>((sp, httpClient) =>
+        builder.Services.AddHttpClient<IFitatuClient, FitatuClient>((sp, httpClient) =>
         {
-            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Integrations.Fitatu.FitatuOptions>>().Value;
+            var options = sp.GetRequiredService<IOptions<FitatuOptions>>().Value;
             httpClient.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
         });
 
-        builder.Services.AddSingleton<Security.JwtParser>();
+        builder.Services.AddSingleton<JwtParser>();
 
-        builder.Services.AddHttpClient<Integrations.Suunto.ISuuntoActivityExportClient, Integrations.Suunto.SuuntoActivityExportClient>(httpClient =>
+        builder.Services.AddHttpClient<ISuuntoActivityExportClient, SuuntoActivityExportClient>(httpClient =>
         {
             httpClient.BaseAddress = new Uri("https://247.sports-tracker.com", UriKind.Absolute);
         });
 
-        builder.Services.AddHttpClient<Integrations.Suunto.ISuuntoSleepExportClient, Integrations.Suunto.SuuntoSleepExportClient>(httpClient =>
+        builder.Services.AddHttpClient<ISuuntoSleepExportClient, SuuntoSleepExportClient>(httpClient =>
         {
             httpClient.BaseAddress = new Uri("https://247.sports-tracker.com", UriKind.Absolute);
         });
 
-        builder.Services.AddScoped<Application.Suunto.SuuntoGetDailyActivitySummaryUseCase>();
-        builder.Services.AddScoped<Application.Suunto.SuuntoGetDailySleepSummaryUseCase>();
+        builder.Services.AddScoped<SuuntoGetDailyActivitySummaryUseCase>();
+        builder.Services.AddScoped<SuuntoGetDailySleepSummaryUseCase>();
 
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
@@ -73,7 +82,7 @@ public class Program
 
         using (var scope = app.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Database.EnsureCreated();
         }
 
@@ -93,7 +102,7 @@ public class Program
         app.MapHub<Realtime.FitatuMonthHub>("/hubs/fitatu-month");
 
         app.MapGet("/api/fitatu/session", async (
-                Application.Fitatu.IFitatuSessionRepository repository,
+                IFitatuSessionRepository repository,
                 CancellationToken cancellationToken) =>
             {
                 var session = await repository.GetLatestAsync(cancellationToken);
@@ -112,7 +121,7 @@ public class Program
 
         app.MapPost("/api/fitatu/login", async (
                 Api.Fitatu.FitatuLoginRequest request,
-                Application.Fitatu.FitatuLoginUseCase useCase,
+                FitatuLoginUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -128,7 +137,7 @@ public class Program
             .WithName("FitatuLogin");
 
         app.MapPost("/api/fitatu/logout", async (
-                Application.Fitatu.IFitatuSessionRepository repository,
+                IFitatuSessionRepository repository,
                 CancellationToken cancellationToken) =>
             {
                 await repository.ClearAsync(cancellationToken);
@@ -138,7 +147,7 @@ public class Program
 
         app.MapGet("/api/fitatu/day/{date}", async (
                 string date,
-                Application.Fitatu.FitatuGetDayUseCase useCase,
+                FitatuGetDayUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var day))
@@ -170,7 +179,7 @@ public class Program
 
         app.MapPost("/api/fitatu/month/{yearMonth}/recalculate", async (
                 string yearMonth,
-                Application.Fitatu.FitatuStartMonthRecalculationUseCase useCase,
+                FitatuStartMonthRecalculationUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -199,8 +208,8 @@ public class Program
 
         app.MapGet("/api/fitatu/month/{yearMonth}/statuses", async (
                 string yearMonth,
-                Application.Fitatu.IFitatuSessionRepository sessionRepository,
-                Application.Fitatu.IMonthDaySummaryRepository summaryRepository,
+                IFitatuSessionRepository sessionRepository,
+                IMonthDaySummaryRepository summaryRepository,
                 CancellationToken cancellationToken) =>
             {
                 var session = await sessionRepository.GetLatestAsync(cancellationToken);
@@ -236,7 +245,7 @@ public class Program
 
         app.MapGet("/api/fitatu/export/day/{date}", async (
                 string date,
-                Application.Fitatu.FitatuExportDayCsvUseCase useCase,
+                FitatuExportDayCsvUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var day))
@@ -258,7 +267,7 @@ public class Program
 
         app.MapGet("/api/fitatu/export/month/{yearMonth}", async (
                 string yearMonth,
-                Application.Fitatu.FitatuExportMonthCsvUseCase useCase,
+                FitatuExportMonthCsvUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -291,7 +300,7 @@ public class Program
                 string? from,
                 string? to,
                 int? ttlMinutes,
-                Application.Suunto.SuuntoGetDailyActivitySummaryUseCase useCase,
+                SuuntoGetDailyActivitySummaryUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
@@ -344,7 +353,7 @@ public class Program
                 string? from,
                 string? to,
                 int? ttlMinutes,
-                Application.Suunto.SuuntoGetDailySleepSummaryUseCase useCase,
+                SuuntoGetDailySleepSummaryUseCase useCase,
                 CancellationToken cancellationToken) =>
             {
                 if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
