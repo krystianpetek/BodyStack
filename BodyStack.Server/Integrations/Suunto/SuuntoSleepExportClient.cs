@@ -1,4 +1,7 @@
 using System.Net.Http.Headers;
+using System.Reactive;
+using System.Reactive.Linq;
+using BodyStack.Server.Infrastructure.Http.Resilience;
 
 namespace BodyStack.Server.Integrations.Suunto;
 
@@ -11,18 +14,38 @@ public sealed class SuuntoSleepExportClient : ISuuntoSleepExportClient
         _http = http;
     }
 
-    public Task<HttpResponseMessage> GetSleepExportAsync(string sttAuthorization, CancellationToken cancellationToken = default)
+    public IObservable<HttpResponseMessage> GetSleepExportAsync(
+        string sttAuthorization, 
+        CancellationToken cancellationToken = default)
     {
-        var req = new HttpRequestMessage(HttpMethod.Get, "/v1/sleep/export");
-        AddHeaders(req, sttAuthorization);
-        return _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        return Observable.FromAsync(async ct =>
+        {
+            var policy = ResiliencePolicyFactory.CreateStreamingPolicy();
+            
+            return await policy.ExecuteAsync(async innerCt =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, "/v1/sleep/export");
+                AddHeaders(req, sttAuthorization);
+                return await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, innerCt);
+            }, ct);
+        });
     }
 
-    public Task<HttpResponseMessage> GetSleepStagesExportAsync(string sttAuthorization, CancellationToken cancellationToken = default)
+    public IObservable<HttpResponseMessage> GetSleepStagesExportAsync(
+        string sttAuthorization, 
+        CancellationToken cancellationToken = default)
     {
-        var req = new HttpRequestMessage(HttpMethod.Get, "/v1/sleepstages/export");
-        AddHeaders(req, sttAuthorization);
-        return _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        return Observable.FromAsync(async ct =>
+        {
+            var policy = ResiliencePolicyFactory.CreateStreamingPolicy();
+            
+            return await policy.ExecuteAsync(async innerCt =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, "/v1/sleepstages/export");
+                AddHeaders(req, sttAuthorization);
+                return await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, innerCt);
+            }, ct);
+        });
     }
 
     private static void AddHeaders(HttpRequestMessage req, string sttAuthorization)
