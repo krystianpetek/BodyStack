@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -73,7 +75,9 @@ public sealed class SuuntoGetDailyActivitySummaryUseCase
             return File.OpenRead(dataPath);
         }
 
-        using var resp = await _client.GetActivityExportAsync(sttAuthorization, cancellationToken);
+        using var resp = await _client.GetActivityExportAsync(sttAuthorization, cancellationToken)
+        .FirstAsync()
+        .ToTask(cancellationToken);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await SafeReadBodyAsync(resp, cancellationToken);

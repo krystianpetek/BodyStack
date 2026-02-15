@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -46,8 +48,9 @@ public sealed class SuuntoGetDailySleepSummaryUseCase
             tokenHash,
             ttl,
             cacheFilePrefix: "sleep",
-            fetch: (token, ct) => _client.GetSleepExportAsync(token, ct),
-            cancellationToken);
+            fetch: (token, ct) => _client.GetSleepExportAsync(token, ct)
+            .FirstAsync()
+            .ToTask(ct), cancellationToken);
 
         await using (ndjsonStream)
         {
@@ -73,8 +76,9 @@ public sealed class SuuntoGetDailySleepSummaryUseCase
             tokenHash,
             ttl,
             cacheFilePrefix: "sleepstages",
-            fetch: (token, ct) => _client.GetSleepStagesExportAsync(token, ct),
-            cancellationToken);
+            fetch: (token, ct) => _client.GetSleepStagesExportAsync(token, ct)
+            .FirstAsync()
+            .ToTask(ct), cancellationToken);
 
         _cache.Set(cacheKey, true, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
     }
