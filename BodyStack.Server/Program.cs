@@ -8,6 +8,7 @@ using BodyStack.Server.Infrastructure.Security;
 using BodyStack.Server.Infrastructure.Persistence;
 using BodyStack.Server.Application.Suunto;
 using BodyStack.Server.Integrations.Suunto;
+using BodyStack.Server.Domain.Services;
 using BodyStack.Server.Security;
 
 namespace BodyStack.Server;
@@ -74,6 +75,16 @@ public class Program
 
         builder.Services.AddScoped<SuuntoGetDailyActivitySummaryUseCase>();
         builder.Services.AddScoped<SuuntoGetDailySleepSummaryUseCase>();
+        
+        // Suunto Workouts & BMR
+        builder.Services.AddHttpClient<ISuuntoWorkoutClient, SuuntoWorkoutClient>();
+        builder.Services.AddScoped<SuuntoGetWorkoutsUseCase>();
+        builder.Services.AddScoped<SuuntoGetDailySummaryUseCase>();
+        builder.Services.AddSingleton<BmrCalculator>();
+        
+        // Suunto User Profile
+        builder.Services.AddHttpClient<ISuuntoUserClient, SuuntoUserClient>();
+        builder.Services.AddScoped<SuuntoGetUserProfileUseCase>();
 
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
@@ -405,6 +416,131 @@ public class Program
                 return Results.Ok(response);
             })
             .WithName("SuuntoSleepDaily");
+
+        // Suunto Workouts Endpoint
+        app.MapGet("/api/suunto/workouts", async (
+                HttpRequest request,
+                string? from,
+                string? to,
+                int? ttlMinutes,
+                SuuntoGetWorkoutsUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
+                {
+                    return Results.Unauthorized();
+                }
+
+                DateOnly? fromDate = null;
+                DateOnly? toDate = null;
+
+                if (!string.IsNullOrWhiteSpace(from))
+                {
+                    if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", out var parsedFrom))
+                    {
+                        return Results.BadRequest(new { error = "Invalid from date format. Expected yyyy-MM-dd." });
+                    }
+                    fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrWhiteSpace(to))
+                {
+                    if (!DateOnly.TryParseExact(to, "yyyy-MM-dd", out var parsedTo))
+                    {
+                        return Results.BadRequest(new { error = "Invalid to date format. Expected yyyy-MM-dd." });
+                    }
+                    toDate = parsedTo;
+                }
+
+                var ttl = TimeSpan.FromMinutes(ttlMinutes.GetValueOrDefault(15));
+                if (ttl < TimeSpan.FromMinutes(1)) ttl = TimeSpan.FromMinutes(1);
+                if (ttl > TimeSpan.FromHours(24)) ttl = TimeSpan.FromHours(24);
+
+                try
+                {
+                    var result = await useCase.ExecuteAsync(authHeader.ToString(), ttl, fromDate, toDate, cancellationToken);
+                    return Results.Ok(result);
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            })
+            .WithName("SuuntoWorkouts");
+
+        // Suunto Daily Summary Endpoint
+        app.MapGet("/api/suunto/daily-summary", async (
+                HttpRequest request,
+                string date,
+                double weightKg,
+                double heightCm,
+                int age,
+                string gender,
+                int? ttlMinutes,
+                SuuntoGetDailySummaryUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", out var parsedDate))
+                {
+                    return Results.BadRequest(new { error = "Invalid date format. Expected yyyy-MM-dd." });
+                }
+
+                if (weightKg <= 0 || heightCm <= 0 || age <= 0)
+                {
+                    return Results.BadRequest(new { error = "Weight, height, and age must be positive values." });
+                }
+
+                var ttl = TimeSpan.FromMinutes(ttlMinutes.GetValueOrDefault(15));
+                if (ttl < TimeSpan.FromMinutes(1)) ttl = TimeSpan.FromMinutes(1);
+                if (ttl > TimeSpan.FromHours(24)) ttl = TimeSpan.FromHours(24);
+
+                try
+                {
+                    var result = await useCase.ExecuteAsync(
+                        authHeader.ToString(),
+                        parsedDate,
+                        weightKg,
+                        heightCm,
+                        age,
+                        gender,
+                        ttl,
+                        cancellationToken);
+                    return Results.Ok(result);
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            })
+            .WithName("SuuntoDailySummary");
+
+        // Suunto User Profile Endpoint
+        app.MapGet("/api/suunto/user/profile", async (
+                HttpRequest request,
+                SuuntoGetUserProfileUseCase useCase,
+                CancellationToken cancellationToken) =>
+            {
+                if (!request.Headers.TryGetValue("sttauthorization", out var authHeader) || string.IsNullOrWhiteSpace(authHeader.ToString()))
+                {
+                    return Results.Unauthorized();
+                }
+
+                try
+                {
+                    var profile = await useCase.ExecuteAsync(authHeader.ToString(), cancellationToken);
+                    return Results.Ok(profile);
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(ex.Message);
+                }
+            })
+            .WithName("SuuntoUserProfile");
 
         app.Run();
     }

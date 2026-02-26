@@ -8,6 +8,8 @@ import {
   type SuuntoDailySleepSummaryResponse,
 } from '../../api/suuntoApi'
 import { useIntegrationsAuth } from '../../hooks/useIntegrationsAuth'
+import { SuuntoWorkoutList } from '../../components/suunto/SuuntoWorkoutList'
+import { DailySummaryWithWorkouts } from '../../components/suunto/DailySummaryWithWorkouts'
 
 export default function SuuntoPage() {
   const auth = useIntegrationsAuth()
@@ -143,6 +145,13 @@ export default function SuuntoPage() {
             )
           }
         >
+          {data && (
+            <div className="mb-4">
+              <DailySummaryWithWorkouts 
+                activityDays={data.days.map(d => ({ date: d.date, energyConsumption: d.energyConsumption }))} 
+              />
+            </div>
+          )}
           {error ? <div className="text-sm font-medium text-rose-600 dark:text-rose-400">{error}</div> : null}
 
           {data ? (
@@ -191,6 +200,12 @@ export default function SuuntoPage() {
             <div className="text-sm text-slate-600 dark:text-slate-400">Load daily summary from Suunto activity export.</div>
           )}
         </Card>
+      </div>
+
+      {/* Workouts Section */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold mb-4">Workouts</h3>
+        <SuuntoWorkoutList />
       </div>
     </div>
   )

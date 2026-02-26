@@ -159,7 +159,8 @@ public sealed class SuuntoGetDailyActivitySummaryUseCase
 
             if (entry.EntryData.EnergyConsumption is double energy)
             {
-                acc.Energy += energy;
+                // Convert joules to kcal (1 kcal = 4186 joules)
+                acc.Energy += energy / 4184.0;
             }
 
             if (entry.EntryData.Hr is double hr)
